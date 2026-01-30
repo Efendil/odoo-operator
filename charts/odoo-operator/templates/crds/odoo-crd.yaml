@@ -1,0 +1,272 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: odooinstances.bemade.org
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: bemade.org
+  names:
+    kind: OdooInstance
+    listKind: OdooInstanceList
+    plural: odooinstances
+    singular: odooinstance
+    shortNames:
+      - odoo
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - image
+                - ingress
+              properties:
+                image:
+                  type: string
+                  description: "Odoo Docker image to use."
+                  default: "odoo:19.0"
+                imagePullSecret:
+                  type: string
+                  description: "Image pull secret to use."
+                adminPassword:
+                  type: string
+                  description: "Odoo database administrator password to use."
+                replicas:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                  description: "Number of Odoo replicas"
+                workers:
+                  type: integer
+                  default: 4
+                  description: "Number of Odoo workers per pod"
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: 500m
+                        memory:
+                          type: string
+                          default: 1Gi
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: 4000m
+                        memory:
+                          type: string
+                          default: 4Gi
+                database:
+                  type: object
+                  description: "Database configuration. If wal is specified, uses CNPG mode with managed PostgreSQL."
+                  properties:
+                    cluster:
+                      type: string
+                      description: "Legacy mode: Name of the PostgreSQL cluster from the postgres-clusters secret."
+                    replicas:
+                      type: integer
+                      default: 3
+                      description: "CNPG mode: Number of PostgreSQL replicas"
+                    storage:
+                      type: string
+                      default: "10Gi"
+                      description: "CNPG mode: Storage size per replica"
+                    wal:
+                      type: object
+                      description: "CNPG mode: WAL archiving configuration for Point-in-Time Recovery"
+                      properties:
+                        s3Bucket:
+                          type: string
+                          description: "S3 bucket for WAL archiving"
+                        s3Endpoint:
+                          type: string
+                          description: "S3 endpoint URL"
+                        s3CredentialsSecretRef:
+                          type: object
+                          description: "Reference to a Secret containing S3 credentials (accessKey and secretKey keys)"
+                          required:
+                            - name
+                          properties:
+                            name:
+                              type: string
+                              description: "Name of the Secret containing S3 credentials"
+                        retentionDays:
+                          type: integer
+                          default: 30
+                          description: "Number of days to retain WAL archives for PITR"
+                # NOTE: Database initialization/restore handled via OdooRestoreJob CRD
+                # NOTE: Upgrades handled via OdooUpgradeJob CRD
+                filestore:
+                  type: object
+                  description: "Filestore configuration. If s3Bucket is specified, uses JuiceFS with CNPG metadata."
+                  properties:
+                    storageSize:
+                      type: string
+                      default: "50Gi"
+                      description: "Storage size for filestore"
+                    storageClass:
+                      type: string
+                      default: "juicefs-sc"
+                      description: "Storage class for filestore PVC"
+                    s3Bucket:
+                      type: string
+                      description: "JuiceFS mode: S3 bucket for data storage"
+                    s3Endpoint:
+                      type: string
+                      description: "JuiceFS mode: S3 endpoint URL"
+                    s3CredentialsSecretRef:
+                      type: object
+                      description: "JuiceFS mode: Reference to a Secret containing S3 credentials"
+                      properties:
+                        name:
+                          type: string
+                          description: "Name of the Secret containing S3 credentials"
+                    trashDays:
+                      type: integer
+                      default: 30
+                      description: "JuiceFS mode: Number of days to retain deleted files"
+                addons:
+                  type: array
+                  description: "Git repositories for addon synchronization via git-sync sidecars"
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - repo
+                    properties:
+                      name:
+                        type: string
+                        description: "Addon directory name (mounted at /mnt/extra-addons/<name>)"
+                      repo:
+                        type: string
+                        description: "Git repository URL (SSH or HTTPS)"
+                      branch:
+                        type: string
+                        default: "main"
+                        description: "Git branch to sync"
+                      tag:
+                        type: string
+                        description: "Git tag to sync (overrides branch if specified)"
+                      sshSecretRef:
+                        type: object
+                        description: "Reference to a Secret containing ssh-privatekey for private repos"
+                        properties:
+                          name:
+                            type: string
+                            description: "Name of the Secret containing ssh-privatekey"
+                ingress:
+                  type: object
+                  required:
+                    - hosts
+                    - issuer
+                  properties:
+                    hosts:
+                      type: array
+                      items:
+                        type: string
+                      description: "The fully qualified domain names (FQDN) for this host."
+                    issuer:
+                      type: string
+                      description: "The name of the ClusterIssuer to use to issue the TLS certificate."
+                    class:
+                      type: string
+                      description: "The ingress class to use."
+                configOptions:
+                  type: object
+                  description: "Options for the odoo.conf file"
+                  additionalProperties:
+                    type: string
+                  example:
+                    workers: "4"
+                    limit_time_real: "600"
+                    limit_time_cpu: "600"
+                sync:
+                  type: object
+                  description: "Configuration for Git repository synchronization (uses addons for repository details)"
+                  properties:
+                    enabled:
+                      type: boolean
+                      description: "When set to true, triggers a sync operation. Resets to false after sync completes."
+                      default: false
+                    time:
+                      type: string
+                      description: "The scheduled time for sync. Format: YYYY-MM-DDTHH:MM:SSZ."
+                      format: date-time
+                # NOTE: spec.restore has been moved to OdooRestoreJob CRD
+                # Use OdooRestoreJob CR to trigger restore operations
+                webhook:
+                  type: object
+                  description: "Webhook configuration for status update notifications"
+                  properties:
+                    url:
+                      type: string
+                      description: "URL to POST status updates to when instance phase changes"
+
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Running
+                    - Upgrading
+                    - Restoring
+                  default: Running
+                message:
+                  type: string
+                ready:
+                  type: boolean
+                url:
+                  type: string
+                lastBackup:
+                  type: string
+                  format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+      additionalPrinterColumns:
+        - name: Image
+          type: string
+          jsonPath: .spec.image
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: URL
+          type: string
+          jsonPath: .status.url
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}

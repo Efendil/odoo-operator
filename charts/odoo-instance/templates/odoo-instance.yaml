@@ -1,0 +1,93 @@
+apiVersion: bemade.org/v1
+kind: OdooInstance
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  image: {{ .Values.image | required "Field image is required." }}
+  {{- if .Values.imagePullSecret }}
+  imagePullSecret: {{ .Values.imagePullSecret }}
+  {{- end }}
+  {{- if .Values.adminPassword }}
+  adminPassword: {{ .Values.adminPassword }}
+  {{- end }}
+  replicas: {{ .Values.replicas | default 1 }}
+  resources:
+    requests:
+      cpu: {{ .Values.resources.requests.cpu | default "500m" }}
+      memory: {{ .Values.resources.requests.memory | default "1Gi" }}
+    limits:
+      cpu: {{ .Values.resources.limits.cpu | default "4000m" }}
+      memory: {{ .Values.resources.limits.memory | default "4Gi" }}
+  {{- if .Values.database }}
+  database:
+    {{- if .Values.database.cluster }}
+    cluster: {{ .Values.database.cluster }}
+    {{- end }}
+    {{- if .Values.database.replicas }}
+    replicas: {{ .Values.database.replicas }}
+    {{- end }}
+    {{- if .Values.database.storage }}
+    storage: {{ .Values.database.storage }}
+    {{- end }}
+    {{- if .Values.database.wal }}
+    wal:
+      s3Bucket: {{ .Values.database.wal.s3Bucket }}
+      s3Endpoint: {{ .Values.database.wal.s3Endpoint }}
+      s3CredentialsSecretRef:
+        name: {{ .Values.database.wal.s3CredentialsSecretRef.name }}
+      {{- if .Values.database.wal.retentionDays }}
+      retentionDays: {{ .Values.database.wal.retentionDays }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  filestore:
+    storageSize: {{ .Values.filestore.storageSize | default "50Gi" }}
+    storageClass: {{ .Values.filestore.storageClass | default "juicefs-sc" }}
+    {{- if .Values.filestore.s3Bucket }}
+    s3Bucket: {{ .Values.filestore.s3Bucket }}
+    {{- end }}
+    {{- if .Values.filestore.s3Endpoint }}
+    s3Endpoint: {{ .Values.filestore.s3Endpoint }}
+    {{- end }}
+    {{- if .Values.filestore.s3CredentialsSecretRef }}
+    s3CredentialsSecretRef:
+      name: {{ .Values.filestore.s3CredentialsSecretRef.name }}
+    {{- end }}
+    {{- if .Values.filestore.trashDays }}
+    trashDays: {{ .Values.filestore.trashDays }}
+    {{- end }}
+  {{- if .Values.addons }}
+  addons:
+    {{- range .Values.addons }}
+    - name: {{ .name }}
+      repo: {{ .repo }}
+      {{- if .branch }}
+      branch: {{ .branch | quote }}
+      {{- end }}
+      {{- if .tag }}
+      tag: {{ .tag | quote }}
+      {{- end }}
+      {{- if .sshSecretRef }}
+      sshSecretRef:
+        name: {{ .sshSecretRef.name }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  ingress:
+    hosts:
+      {{- range .Values.ingress.hosts | required "Field ingress.hosts is required. This is the FQDN for the Odoo instance." }}
+      - {{ . }}
+      {{- end }}
+    issuer: {{ .Values.ingress.issuer | required "Field ingress.issuer is required. This is generally a ClusterIssuer name." }}
+    {{- if .Values.ingress.class }}
+    class: {{ .Values.ingress.class }}
+    {{- end }}
+  {{- if .Values.configOptions }}
+  configOptions:
+    {{- toYaml .Values.configOptions | nindent 4 }}
+  {{- end }}
+  {{- if .Values.webhook }}
+  webhook:
+    {{- toYaml .Values.webhook | nindent 4 }}
+  {{- end }}

@@ -1,0 +1,81 @@
+# Default values for odoo-instance.
+# This is a YAML-formatted file.
+
+# Odoo image to use
+image: odoo:19.0
+
+# Image pull secret for private registries
+imagePullSecret: ""
+
+# Odoo admin password
+adminPassword: ""
+
+# Number of Odoo replicas
+replicas: 1
+
+# Resource limits and requests for Odoo pods
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+
+# Database configuration
+# If wal is specified, uses CNPG mode with managed PostgreSQL.
+# Otherwise, uses legacy mode with external PostgreSQL clusters.
+database: {}
+  # CNPG mode configuration:
+  # replicas: 3
+  # storage: 10Gi
+  # wal:
+  #   s3Bucket: my-odoo-wal
+  #   s3Endpoint: https://s3.eu-central-1.wasabisys.com
+  #   s3CredentialsSecretRef:
+  #     name: s3-credentials
+  #   retentionDays: 30
+  #
+  # Legacy mode configuration:
+  # cluster: main  # Name from postgres-clusters secret
+
+# Filestore configuration
+# If s3Bucket is specified, uses JuiceFS with CNPG metadata storage.
+filestore:
+  storageSize: 50Gi
+  storageClass: juicefs-sc
+  # JuiceFS mode configuration (requires database.wal to be set):
+  # s3Bucket: my-odoo-filestore
+  # s3Endpoint: https://s3.eu-central-1.wasabisys.com
+  # s3CredentialsSecretRef:
+  #   name: s3-credentials
+  # trashDays: 30
+
+# Git-sync addons configuration
+# Syncs addon directories from Git repositories via sidecars
+addons: []
+  # - name: enterprise
+  #   repo: git@gitlab.com:odoo/enterprise.git
+  #   branch: "19.0"
+  #   sshSecretRef:
+  #     name: gitlab-ssh-key
+  # - name: custom-addons
+  #   repo: https://github.com/myorg/odoo-addons.git
+  #   branch: main
+
+# Ingress configuration
+ingress:
+  hosts: []
+    # - odoo.example.com
+  issuer: "" # ClusterIssuer name for TLS certificates
+  class: "" # Optional ingress class
+
+# Extra Odoo configuration options (written to odoo.conf)
+configOptions:
+  workers: "4"
+  limit_time_real: "600"
+  limit_time_cpu: "600"
+
+# Webhook for status notifications
+webhook: {}
+  # url: https://api.example.com/webhook

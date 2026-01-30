@@ -1,0 +1,70 @@
+apiVersion: bemade.org/v1
+kind: OdooInstance
+metadata:
+  name: my-odoo
+spec:
+  # Odoo 19.0 with enterprise addons
+  image: docker.bemade.org/bemade/odoo19.0e
+
+  # Admin password for Odoo
+  adminPassword: abc123
+
+  # Database configuration (CNPG managed cluster)
+  database:
+    # Number of PostgreSQL replicas (default: 3)
+    replicas: 3
+    # Storage size for PostgreSQL data
+    storage: 10Gi
+    # WAL archiving to S3 for PITR
+    wal:
+      s3Bucket: my-odoo-wal
+      s3Endpoint: https://s3.eu-central-1.wasabisys.com
+      s3CredentialsSecretRef:
+        name: s3-credentials
+      retentionDays: 30
+
+  # JuiceFS-backed filestore (S3 + CNPG metadata)
+  filestore:
+    storageSize: 50Gi
+    storageClass: juicefs-sc
+    s3Bucket: my-odoo-filestore
+    s3Endpoint: https://s3.eu-central-1.wasabisys.com
+    s3CredentialsSecretRef:
+      name: s3-credentials
+    trashDays: 30
+
+  # Git-sync addons (automatically synced every 60s)
+  addons:
+    - name: enterprise
+      repo: git@gitlab.com:bemade/odoo-enterprise.git
+      branch: "19.0"
+      sshSecretRef:
+        name: gitlab-deploy-key
+    - name: custom
+      repo: git@gitlab.com:mycompany/odoo-custom.git
+      tag: v1.2.3
+      sshSecretRef:
+        name: gitlab-deploy-key
+
+  # Worker configuration (default: 4 workers)
+  workers: 4
+
+  # Resource allocation for 4-worker setup
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "4000m"
+      memory: "4Gi"
+
+  # Additional Odoo config options
+  configOptions:
+    limit_time_real: "0"
+    limit_time_cpu: "0"
+
+  # Ingress configuration
+  ingress:
+    hosts:
+      - my-odoo.example.com
+    issuer: letsencrypt-dns

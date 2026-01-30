@@ -1,0 +1,18 @@
+apiVersion: v2
+name: odoo-instance
+version: 0.5.0
+description: A Helm chart for creating Odoo instances with the Odoo Operator
+type: application
+home: https://github.com/bemade/odoo-operator
+sources:
+  - https://github.com/bemade/odoo-operator
+maintainers:
+  - name: Bemade Inc.
+    url: https://bemade.org
+    email: marc@bemade.org
+keywords:
+  - odoo
+  - operator
+  - instance
+  - cnpg
+  - juicefs
