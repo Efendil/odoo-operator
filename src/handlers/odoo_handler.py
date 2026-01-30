@@ -72,7 +72,10 @@ class OdooHandler(ResourceHandler):
         self.ingress = Ingress(self)
 
         # Check if using new CNPG mode or legacy external DB
-        self._use_cnpg = "database" in self.spec
+        # CNPG mode is triggered by database.wal being specified (enables WAL archiving + JuiceFS)
+        # Legacy mode uses database.cluster (references external PostgreSQL)
+        database_spec = self.spec.get("database", {})
+        self._use_cnpg = "wal" in database_spec
 
         # Create handlers list in the correct order for creation/update
         if self._use_cnpg:

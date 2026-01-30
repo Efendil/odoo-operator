@@ -37,6 +37,9 @@ def stub_subhandlers(monkeypatch):
         "PullSecret",
         "OdooUserSecret",
         "FilestorePVC",
+        "CNPGCluster",
+        "JuiceFSStorage",
+        "AddonSync",
         "OdooConf",
         "TLSCert",
         "Deployment",
@@ -172,3 +175,47 @@ def test_from_job_info_404(monkeypatch):
         lambda *args, **kwargs: (_ for _ in ()).throw(ApiException(status=404)),
     )
     assert OdooHandler.from_job_info("default", "demo") is None
+
+
+def test_cnpg_mode_disabled_without_database():
+    """Without database field, should use legacy mode."""
+    body = {
+        "metadata": {"name": "demo", "namespace": "default", "uid": "u1"},
+        "spec": {"image": "odoo:19.0"},
+    }
+    handler = OdooHandler(body)
+    assert handler._use_cnpg is False
+
+
+def test_cnpg_mode_disabled_with_cluster_only():
+    """With database.cluster but no wal, should use legacy mode."""
+    body = {
+        "metadata": {"name": "demo", "namespace": "default", "uid": "u1"},
+        "spec": {
+            "image": "odoo:19.0",
+            "database": {"cluster": "main"},
+        },
+    }
+    handler = OdooHandler(body)
+    assert handler._use_cnpg is False
+
+
+def test_cnpg_mode_enabled_with_wal():
+    """With database.wal, should use CNPG mode."""
+    body = {
+        "metadata": {"name": "demo", "namespace": "default", "uid": "u1"},
+        "spec": {
+            "image": "odoo:19.0",
+            "database": {
+                "replicas": 3,
+                "wal": {
+                    "s3Bucket": "my-bucket",
+                    "s3Endpoint": "https://s3.wasabisys.com",
+                    "s3CredentialsSecretRef": {"name": "s3-creds"},
+                },
+            },
+        },
+    }
+    handler = OdooHandler(body)
+    assert handler._use_cnpg is True
+
